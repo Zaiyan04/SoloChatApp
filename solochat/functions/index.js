@@ -7,8 +7,8 @@
  * See a full list of supported triggers at https://firebase.google.com/docs/functions
  */
 
-const {onRequest} = require("firebase-functions/v2/https");
-const logger = require("firebase-functions/logger");
+// const {onRequest} = require("firebase-functions/v2/https");
+// const logger = require("firebase-functions/logger");
 
 // Create and deploy your first functions
 // https://firebase.google.com/docs/functions/get-started
@@ -33,23 +33,26 @@ exports.detectEvilUsers = functions.firestore
         const filter = new Filter();
         const { text, uid } = doc.data(); 
 
+        let userBanned = false;
 
         if (filter.isProfane(text)) {
-
             const cleaned = filter.clean(text);
             await doc.ref.update({text: `🤐 I got BANNED for life for saying... ${cleaned}`});
-
             await db.collection('banned').doc(uid).set({});
+            userBanned = true;
         } 
 
-        const userRef = db.collection('users').doc(uid)
-
+        const userRef = db.collection('users').doc(uid);
         const userData = (await userRef.get()).data();
 
-        if (userData.msgCount >= 7) {
-            await db.collection('banned').doc(uid).set({});
-        } else {
-            await userRef.set({ msgCount: (userData.msgCount || 0) + 1 })
+        if (!userData) {
+            console.error(`No data for user ${uid}`);
+            return;
         }
 
+        if (!userBanned && userData.msgCount >= 7) {
+            await db.collection('banned').doc(uid).set({});
+        } else {
+            await userRef.update({ msgCount: (userData.msgCount || 0) + 1 });
+        }
 });
